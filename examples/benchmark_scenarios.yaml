@@ -1,0 +1,86 @@
+# Benchmark scenarios for `inference-profiler benchmark`.
+#
+# Every value here drives the deterministic simulator (see docs/benchmarking.md).
+# `defaults` is deep-merged into each scenario. Unknown keys are rejected.
+#
+#   inference-profiler benchmark --scenario examples/benchmark_scenarios.yaml
+#   inference-profiler benchmark --scenario examples/benchmark_scenarios.yaml --name baseline
+#   inference-profiler benchmark --scenario examples/benchmark_scenarios.yaml --clock wall
+
+defaults:
+  seed: 42
+  model: demo-model
+  runtime_version: sim-1.0
+  num_requests: 200
+  prompt_tokens: { mean: 512, stddev: 128, min: 16, max: 4096 }
+  generated_tokens: { mean: 64, stddev: 16, min: 1, max: 1024 }
+  scheduler_delay_ms: { mean: 1.0, stddev: 0.5, min: 0.0, max: 50.0 }
+  inter_token_ms: { mean: 6.0, stddev: 1.0, min: 0.5, max: 100.0 }
+  prefill_base_ms: 4.0
+  prefill_ms_per_token: 0.04
+  first_token_overhead_ms: 2.0
+  batch_contention: 0.05
+  cache:
+    enabled: true
+    capacity_entries: 256
+    prefix_pool: 64
+    prefix_skew: 2.0
+  memory:
+    bytes_per_token: 131072        # SIMULATED KV bytes per resident token
+    capacity_bytes: 8589934592     # 8 GiB simulated KV capacity
+
+scenarios:
+  - name: baseline
+    description: Steady closed-loop load at moderate concurrency.
+    concurrency: 8
+
+  - name: congestion
+    description: Open-loop arrivals above sustainable throughput; queueing dominates.
+    concurrency: 4
+    arrival_rate_rps: 12
+    num_requests: 300
+
+  - name: memory-pressure
+    description: Long generations at high concurrency exhaust the simulated KV capacity.
+    concurrency: 32
+    generated_tokens: { mean: 512, stddev: 64, min: 64, max: 1024 }
+    memory:
+      capacity_bytes: 2147483648   # 2 GiB simulated KV capacity
+      pressure_threshold: 0.85
+      pressure_slowdown: 1.6
+
+  - name: cache-thrash
+    description: Many distinct prefixes and a small cache produce misses and evictions.
+    concurrency: 8
+    cache:
+      capacity_entries: 32
+      prefix_pool: 4096
+      prefix_skew: 1.0
+
+  - name: unreliable
+    description: Injected failures and client cancellations.
+    concurrency: 8
+    failure_rate: 0.04
+    cancel_rate: 0.03
+
+  # Concurrency sweep for saturation analysis (same `group`).
+  - name: sweep-c1
+    group: concurrency-sweep
+    concurrency: 1
+    num_requests: 100
+    batch_contention: 0.35
+  - name: sweep-c4
+    group: concurrency-sweep
+    concurrency: 4
+    num_requests: 100
+    batch_contention: 0.35
+  - name: sweep-c16
+    group: concurrency-sweep
+    concurrency: 16
+    num_requests: 100
+    batch_contention: 0.35
+  - name: sweep-c64
+    group: concurrency-sweep
+    concurrency: 64
+    num_requests: 200
+    batch_contention: 0.35

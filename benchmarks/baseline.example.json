@@ -1,0 +1,413 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-01-01T00:00:00+00:00",
+  "label": "EXAMPLE ONLY - illustrates the report schema; values come from the virtual-clock model and are not measurements. Generate a real baseline with `make baseline`.",
+  "git_commit": null,
+  "sdk_version": "0.1.0",
+  "simulator_version": "1",
+  "environment": {
+    "python": "example",
+    "implementation": "example",
+    "platform": "example",
+    "machine": "example",
+    "cpu_count": null,
+    "ci": false
+  },
+  "measurement": {
+    "clock": "virtual",
+    "workload": "example",
+    "latency_source": "virtual_clock_model",
+    "notes": "Latencies come from a deterministic model; they are not measurements.",
+    "cache_statistics": "simulated",
+    "simulated_memory": "simulated KV-cache model; not a real measurement",
+    "process_rss": "not collected"
+  },
+  "scenarios": [
+    {
+      "name": "baseline",
+      "description": "Steady closed-loop load at moderate concurrency.",
+      "group": null,
+      "model": "demo-model",
+      "runtime_version": "sim-1.0",
+      "config": {
+        "name": "baseline",
+        "description": "Steady closed-loop load at moderate concurrency.",
+        "group": null,
+        "seed": 42,
+        "model": "demo-model",
+        "runtime_version": "sim-1.0",
+        "num_requests": 50,
+        "concurrency": 8,
+        "arrival_rate_rps": 0.0,
+        "prompt_tokens": {
+          "mean": 512,
+          "stddev": 128,
+          "min": 16,
+          "max": 4096
+        },
+        "generated_tokens": {
+          "mean": 64,
+          "stddev": 16,
+          "min": 1,
+          "max": 1024
+        },
+        "scheduler_delay_ms": {
+          "mean": 1.0,
+          "stddev": 0.5,
+          "min": 0.0,
+          "max": 50.0
+        },
+        "prefill_base_ms": 4.0,
+        "prefill_ms_per_token": 0.04,
+        "first_token_overhead_ms": 2.0,
+        "inter_token_ms": {
+          "mean": 6.0,
+          "stddev": 1.0,
+          "min": 0.5,
+          "max": 100.0
+        },
+        "batch_contention": 0.05,
+        "failure_rate": 0.0,
+        "cancel_rate": 0.0,
+        "cache": {
+          "enabled": true,
+          "capacity_entries": 256,
+          "prefix_pool": 64,
+          "prefix_skew": 2.0,
+          "hit_prefill_fraction": 0.3,
+          "lookup_ms": 0.2,
+          "insert_ms": 0.3,
+          "evict_ms": 0.1
+        },
+        "memory": {
+          "bytes_per_token": 131072,
+          "capacity_bytes": 8589934592,
+          "pressure_threshold": 0.9,
+          "pressure_slowdown": 1.5,
+          "real_allocation_mb": 0
+        },
+        "regression": {
+          "prefill_multiplier": 1.0,
+          "inter_token_multiplier": 1.0,
+          "queue_delay_add_ms": 0.0,
+          "first_token_add_ms": 0.0
+        },
+        "time_scale": 1.0
+      },
+      "regression_injected": false,
+      "concurrency": 8,
+      "duration_s": 3.681998,
+      "requests": {
+        "total": 50,
+        "completed": 50,
+        "failed": 0,
+        "cancelled": 0,
+        "error_rate": 0.0
+      },
+      "tokens": {
+        "prompt_total": 25218,
+        "generated_total": 3283,
+        "prompt_mean": 504.36
+      },
+      "throughput": {
+        "requests_per_second": 13.5796,
+        "generated_tokens_per_second": 891.6354,
+        "per_request_tokens_per_second": {
+          "count": 50,
+          "min": 119.4773,
+          "mean": 125.3167,
+          "stddev": 3.2535,
+          "p50": 125.0459,
+          "p90": 128.1541,
+          "p95": 130.0327,
+          "p99": 135.5061,
+          "max": 138.7445
+        }
+      },
+      "latency_ms": {
+        "end_to_end": {
+          "count": 50,
+          "min": 183.2323,
+          "mean": 545.1441,
+          "stddev": 126.3977,
+          "p50": 514.9748,
+          "p90": 723.56,
+          "p95": 767.5181,
+          "p99": 806.7386,
+          "max": 812.138
+        },
+        "queue": {
+          "count": 50,
+          "min": 0.0,
+          "mean": 0.9663,
+          "stddev": 0.5361,
+          "p50": 1.0069,
+          "p90": 1.6496,
+          "p95": 1.8176,
+          "p99": 2.0347,
+          "max": 2.1727
+        },
+        "prefill": {
+          "count": 50,
+          "min": 5.064,
+          "mean": 18.2009,
+          "stddev": 9.942,
+          "p50": 19.18,
+          "p90": 31.096,
+          "p95": 34.042,
+          "p99": 37.8908,
+          "max": 39.4
+        },
+        "time_to_first_token": {
+          "count": 50,
+          "min": 7.7029,
+          "mean": 21.3672,
+          "stddev": 9.943,
+          "p50": 22.1726,
+          "p90": 33.7919,
+          "p95": 37.374,
+          "p99": 40.7932,
+          "max": 42.8434
+        },
+        "generation": {
+          "count": 50,
+          "min": 165.7723,
+          "mean": 525.5849,
+          "stddev": 126.2296,
+          "p50": 505.7555,
+          "p90": 687.6227,
+          "p95": 742.6546,
+          "p99": 789.9874,
+          "max": 802.847
+        },
+        "inter_token": {
+          "count": 3233,
+          "min": 2.4579,
+          "mean": 8.0975,
+          "stddev": 1.362,
+          "p50": 8.0818,
+          "p90": 9.8676,
+          "p95": 10.3322,
+          "p99": 11.2144,
+          "max": 13.0701
+        }
+      },
+      "cache": {
+        "enabled": true,
+        "lookups": 50,
+        "hits": 18,
+        "misses": 32,
+        "insertions": 32,
+        "evictions": 0,
+        "hit_ratio": 0.36,
+        "eviction_ratio": 0.0,
+        "simulated": true
+      },
+      "memory": {
+        "process_rss": null,
+        "simulated_kv_cache": {
+          "peak_bytes": 735313920,
+          "capacity_bytes": 8589934592,
+          "peak_pressure": 0.085602,
+          "requests_slowed_by_pressure": 0,
+          "simulated": true
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "congestion",
+      "description": "Open-loop arrivals above sustainable throughput; queueing dominates.",
+      "group": null,
+      "model": "demo-model",
+      "runtime_version": "sim-1.0",
+      "config": {
+        "name": "congestion",
+        "description": "Open-loop arrivals above sustainable throughput; queueing dominates.",
+        "group": null,
+        "seed": 42,
+        "model": "demo-model",
+        "runtime_version": "sim-1.0",
+        "num_requests": 50,
+        "concurrency": 4,
+        "arrival_rate_rps": 12,
+        "prompt_tokens": {
+          "mean": 512,
+          "stddev": 128,
+          "min": 16,
+          "max": 4096
+        },
+        "generated_tokens": {
+          "mean": 64,
+          "stddev": 16,
+          "min": 1,
+          "max": 1024
+        },
+        "scheduler_delay_ms": {
+          "mean": 1.0,
+          "stddev": 0.5,
+          "min": 0.0,
+          "max": 50.0
+        },
+        "prefill_base_ms": 4.0,
+        "prefill_ms_per_token": 0.04,
+        "first_token_overhead_ms": 2.0,
+        "inter_token_ms": {
+          "mean": 6.0,
+          "stddev": 1.0,
+          "min": 0.5,
+          "max": 100.0
+        },
+        "batch_contention": 0.05,
+        "failure_rate": 0.0,
+        "cancel_rate": 0.0,
+        "cache": {
+          "enabled": true,
+          "capacity_entries": 256,
+          "prefix_pool": 64,
+          "prefix_skew": 2.0,
+          "hit_prefill_fraction": 0.3,
+          "lookup_ms": 0.2,
+          "insert_ms": 0.3,
+          "evict_ms": 0.1
+        },
+        "memory": {
+          "bytes_per_token": 131072,
+          "capacity_bytes": 8589934592,
+          "pressure_threshold": 0.9,
+          "pressure_slowdown": 1.5,
+          "real_allocation_mb": 0
+        },
+        "regression": {
+          "prefill_multiplier": 1.0,
+          "inter_token_multiplier": 1.0,
+          "queue_delay_add_ms": 0.0,
+          "first_token_add_ms": 0.0
+        },
+        "time_scale": 1.0
+      },
+      "regression_injected": false,
+      "concurrency": 4,
+      "duration_s": 6.169594,
+      "requests": {
+        "total": 50,
+        "completed": 50,
+        "failed": 0,
+        "cancelled": 0,
+        "error_rate": 0.0
+      },
+      "tokens": {
+        "prompt_total": 26594,
+        "generated_total": 3178,
+        "prompt_mean": 531.88
+      },
+      "throughput": {
+        "requests_per_second": 8.1043,
+        "generated_tokens_per_second": 515.1069,
+        "per_request_tokens_per_second": {
+          "count": 50,
+          "min": 140.7247,
+          "mean": 146.2603,
+          "stddev": 2.9934,
+          "p50": 146.0931,
+          "p90": 150.5462,
+          "p95": 151.8051,
+          "p99": 152.7167,
+          "max": 153.007
+        }
+      },
+      "latency_ms": {
+        "end_to_end": {
+          "count": 50,
+          "min": 292.9761,
+          "mean": 872.1609,
+          "stddev": 359.6951,
+          "p50": 783.8496,
+          "p90": 1451.433,
+          "p95": 1518.6755,
+          "p99": 1619.9839,
+          "max": 1671.291
+        },
+        "queue": {
+          "count": 50,
+          "min": 0.7191,
+          "mean": 417.6981,
+          "stddev": 363.0938,
+          "p50": 321.5557,
+          "p90": 967.307,
+          "p95": 1140.2045,
+          "p99": 1188.248,
+          "max": 1219.6404
+        },
+        "prefill": {
+          "count": 50,
+          "min": 5.112,
+          "mean": 19.0256,
+          "stddev": 9.6297,
+          "p50": 21.1,
+          "p90": 30.42,
+          "p95": 32.268,
+          "p99": 36.0548,
+          "max": 37.76
+        },
+        "time_to_first_token": {
+          "count": 50,
+          "min": 24.1025,
+          "mean": 438.9237,
+          "stddev": 358.4348,
+          "p50": 338.5177,
+          "p90": 981.4706,
+          "p95": 1150.6131,
+          "p99": 1202.8105,
+          "max": 1239.5204
+        },
+        "generation": {
+          "count": 50,
+          "min": 259.1469,
+          "mean": 435.0453,
+          "stddev": 101.5589,
+          "p50": 430.7648,
+          "p90": 547.5094,
+          "p95": 592.4176,
+          "p99": 700.5836,
+          "max": 734.2556
+        },
+        "inter_token": {
+          "count": 3128,
+          "min": 2.0938,
+          "mean": 6.9221,
+          "stddev": 1.1833,
+          "p50": 6.8967,
+          "p90": 8.4345,
+          "p95": 8.8982,
+          "p99": 9.7093,
+          "max": 11.2149
+        }
+      },
+      "cache": {
+        "enabled": true,
+        "lookups": 50,
+        "hits": 18,
+        "misses": 32,
+        "insertions": 32,
+        "evictions": 0,
+        "hit_ratio": 0.36,
+        "eviction_ratio": 0.0,
+        "simulated": true
+      },
+      "memory": {
+        "process_rss": null,
+        "simulated_kv_cache": {
+          "peak_bytes": 369098752,
+          "capacity_bytes": 8589934592,
+          "peak_pressure": 0.042969,
+          "requests_slowed_by_pressure": 0,
+          "simulated": true
+        }
+      },
+      "errors": []
+    }
+  ],
+  "instrumentation_overhead": null,
+  "example": true
+}

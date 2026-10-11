@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kbhavake29/Performance-profiler/schemas/benchmark-report.schema.json",
+  "title": "Inference Profiler benchmark report",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "generated_at",
+    "sdk_version",
+    "environment",
+    "measurement",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "generated_at": { "type": "string" },
+    "label": { "type": ["string", "null"] },
+    "git_commit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+    "sdk_version": { "type": "string" },
+    "simulator_version": { "type": "string" },
+    "example": { "type": "boolean" },
+    "environment": {
+      "type": "object",
+      "required": ["python", "platform", "machine"],
+      "properties": {
+        "python": { "type": "string" },
+        "platform": { "type": "string" },
+        "machine": { "type": "string" },
+        "cpu_count": { "type": ["integer", "null"] },
+        "ci": { "type": "boolean" }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "required": ["clock", "workload", "latency_source"],
+      "properties": {
+        "clock": { "enum": ["virtual", "wall", "example"] },
+        "workload": { "enum": ["simulated", "real", "example"] },
+        "latency_source": { "type": "string" }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/scenario" }
+    },
+    "instrumentation_overhead": { "type": ["object", "null"] }
+  },
+  "$defs": {
+    "distribution": {
+      "type": ["object", "null"],
+      "required": ["count", "min", "mean", "p50", "p90", "p95", "p99", "max"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 1 },
+        "min": { "type": "number" },
+        "mean": { "type": "number" },
+        "stddev": { "type": "number", "minimum": 0 },
+        "p50": { "type": "number" },
+        "p90": { "type": "number" },
+        "p95": { "type": "number" },
+        "p99": { "type": "number" },
+        "max": { "type": "number" }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "required": [
+        "name",
+        "model",
+        "runtime_version",
+        "concurrency",
+        "duration_s",
+        "requests",
+        "throughput",
+        "latency_ms",
+        "cache",
+        "memory",
+        "errors"
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "group": { "type": ["string", "null"] },
+        "model": { "type": "string" },
+        "runtime_version": { "type": "string" },
+        "config": { "type": "object" },
+        "regression_injected": { "type": "boolean" },
+        "concurrency": { "type": "integer", "minimum": 1 },
+        "duration_s": { "type": "number", "exclusiveMinimum": 0 },
+        "requests": {
+          "type": "object",
+          "required": ["total", "completed", "failed", "cancelled", "error_rate"],
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "completed": { "type": "integer", "minimum": 0 },
+            "failed": { "type": "integer", "minimum": 0 },
+            "cancelled": { "type": "integer", "minimum": 0 },
+            "error_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "tokens": { "type": "object" },
+        "throughput": {
+          "type": "object",
+          "required": ["requests_per_second", "generated_tokens_per_second"],
+          "properties": {
+            "requests_per_second": { "type": "number", "minimum": 0 },
+            "generated_tokens_per_second": { "type": "number", "minimum": 0 },
+            "per_request_tokens_per_second": { "$ref": "#/$defs/distribution" }
+          }
+        },
+        "latency_ms": {
+          "type": "object",
+          "required": [
+            "end_to_end",
+            "queue",
+            "prefill",
+            "time_to_first_token",
+            "generation",
+            "inter_token"
+          ],
+          "additionalProperties": { "$ref": "#/$defs/distribution" }
+        },
+        "cache": {
+          "type": "object",
+          "required": ["enabled", "lookups", "hits", "misses", "evictions", "hit_ratio"],
+          "properties": {
+            "hit_ratio": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+          }
+        },
+        "memory": {
+          "type": "object",
+          "required": ["simulated_kv_cache"],
+          "properties": {
+            "process_rss": { "type": ["object", "null"] },
+            "simulated_kv_cache": {
+              "type": "object",
+              "required": ["peak_bytes", "capacity_bytes", "peak_pressure", "simulated"],
+              "properties": { "simulated": { "const": true } }
+            }
+          }
+        },
+        "errors": { "type": "array" }
+      }
+    }
+  }
+}

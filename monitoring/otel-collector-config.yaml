@@ -1,0 +1,74 @@
+# OpenTelemetry Collector (contrib) configuration.
+#
+#   SDKs --OTLP gRPC :4317 / HTTP :4318--> collector
+#     traces  -> Tempo (OTLP gRPC)
+#     metrics -> Prometheus exporter on :8889, scraped by Prometheus
+#
+# ${env:VAR:-default} lets the same file run inside Docker Compose (defaults)
+# and natively (scripts/native_stack.sh overrides the endpoints).
+# Logs are not implemented by the SDKs, so there is no logs pipeline.
+
+extensions:
+  health_check:
+    endpoint: ${env:COLLECTOR_HEALTH_ENDPOINT:-0.0.0.0:13133}
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: ${env:COLLECTOR_OTLP_GRPC_ENDPOINT:-0.0.0.0:4317}
+      http:
+        endpoint: ${env:COLLECTOR_OTLP_HTTP_ENDPOINT:-0.0.0.0:4318}
+
+processors:
+  # Refuse data before the collector runs out of memory (container limit is 512 MiB).
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 400
+    spike_limit_mib: 100
+  batch:
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+    timeout: 2s
+
+exporters:
+  otlp/tempo:
+    endpoint: ${env:TEMPO_OTLP_ENDPOINT:-tempo:4317}
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+      queue_size: 5000
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 60s
+  prometheus:
+    endpoint: ${env:COLLECTOR_PROMETHEUS_ENDPOINT:-0.0.0.0:8889}
+    # OpenMetrics output carries exemplars (trace ids) for metrics-to-traces links.
+    enable_open_metrics: true
+    # Keep series for benchmark-comparison gauges that are published once.
+    metric_expiration: 180m
+    resource_to_telemetry_conversion:
+      enabled: false
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: ${env:COLLECTOR_TELEMETRY_HOST:-0.0.0.0}
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]

@@ -1,0 +1,105 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inference-profiler"
+version = "0.1.0"
+description = "OpenTelemetry-based performance profiler for LLM inference workloads: traces, metrics, bottleneck analysis and benchmark regression checks."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [{ name = "Inference Performance Profiler contributors" }]
+keywords = ["opentelemetry", "llm", "inference", "profiling", "observability", "benchmark"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: System :: Monitoring",
+  "Topic :: Software Development :: Testing",
+  "Typing :: Typed",
+]
+dependencies = [
+  "opentelemetry-api>=1.30,<2",
+  "opentelemetry-sdk>=1.30,<2",
+  "opentelemetry-exporter-otlp-proto-http>=1.30,<2",
+  "PyYAML>=6.0,<7",
+  "psutil>=5.9,<8",
+  "jsonschema>=4.20,<5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<10",
+  "pytest-cov>=5,<8",
+  "ruff>=0.6,<1",
+  "mypy>=1.10,<3",
+  "build>=1.2,<2",
+  "types-PyYAML",
+  "types-psutil",
+  "types-jsonschema",
+  "pre-commit>=3,<5",
+]
+
+[project.scripts]
+inference-profiler = "inference_profiler.cli:main"
+
+[project.urls]
+Documentation = "https://github.com/kbhavake29/Performance-profiler/tree/main/docs"
+Source = "https://github.com/kbhavake29/Performance-profiler"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+inference_profiler = ["py.typed", "schemas/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+addopts = "-ra --strict-markers"
+markers = [
+  "integration: requires the local observability stack (docker compose) to be running",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "PL", "PT"]
+ignore = [
+  "PLR0913",  # many-argument constructors are deliberate for config objects
+  "PLR2004",  # magic numbers are expected in thresholds and tests
+  "PLR0911",
+  "PLR0912",
+  "PLR0915",
+  "PLW0603",
+  "PLR0917",  # positional args in internal helpers
+  "PLC0415",  # deliberate lazy imports keep exporter dependencies off the import path
+  "SIM105",
+  "E501",     # long lines are left to `ruff format`; it does not split strings
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PT011", "PT012", "PT018", "SIM117", "E731"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+mypy_path = "src"
+packages = ["inference_profiler"]
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["opentelemetry.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["inference_profiler"]
+branch = true

@@ -1,0 +1,17 @@
+.git
+.venv
+venv
+build
+build-*
+out
+.native-stack
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+dist
+*.egg-info
+benchmarks/results/*.json
+benchmarks/results/*.md
+.env

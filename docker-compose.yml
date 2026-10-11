@@ -1,0 +1,141 @@
+# Local observability stack for the Inference Performance Profiler.
+#
+#   docker compose up -d                          # collector, Tempo, Prometheus, Grafana
+#   docker compose --profile demo up loadgen      # optional: containerised Python demo
+#   docker compose --profile demo up cpp-demo     # optional: containerised native demo
+#
+# Host ports are bound to 127.0.0.1 only. Development credentials below must
+# never be used on a reachable host.
+name: inference-profiler
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  otel-collector:
+    <<: *restart
+    image: otel/opentelemetry-collector-contrib:0.161.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./monitoring/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "127.0.0.1:4317:4317"   # OTLP gRPC
+      - "127.0.0.1:4318:4318"   # OTLP HTTP (SDK default)
+      - "127.0.0.1:8889:8889"   # Prometheus exporter (scraped by Prometheus)
+      - "127.0.0.1:13133:13133" # health_check extension
+    mem_limit: 512m
+    depends_on:
+      tempo:
+        condition: service_started
+    # The collector image has no shell or HTTP client, so health is checked from
+    # the host by scripts/verify_stack.sh (http://localhost:13133).
+
+  tempo-init:
+    # Tempo runs as UID 10001; make the named volume writable for it.
+    image: grafana/tempo:2.10.8
+    user: root
+    entrypoint: ["chown", "-R", "10001:10001", "/var/tempo"]
+    volumes:
+      - tempo-data:/var/tempo
+
+  tempo:
+    <<: *restart
+    image: grafana/tempo:2.10.8
+    command: ["-config.file=/etc/tempo.yaml", "-config.expand-env=true"]
+    volumes:
+      - ./monitoring/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "127.0.0.1:3200:3200"   # Tempo HTTP API (queried by Grafana)
+    depends_on:
+      tempo-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3200/ready | grep -q ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  prometheus:
+    <<: *restart
+    image: prom/prometheus:v3.13.4
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      - otel-collector
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/ready | grep -q Ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  grafana:
+    <<: *restart
+    image: grafana/grafana:12.4.12
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      TEMPO_URL: http://tempo:3200
+      DASHBOARDS_DIR: /var/lib/grafana/dashboards
+      # Local development defaults. Override via a .env file; never expose publicly.
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/inference-overview.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health | grep -q ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # ------------------------------------------------------------ optional demos
+  loadgen:
+    profiles: ["demo"]
+    build:
+      context: .
+      target: python
+    command: ["inference-profiler", "demo", "--requests", "200"]
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: inference-profiler-loadgen
+    depends_on:
+      - otel-collector
+
+  cpp-demo:
+    profiles: ["demo"]
+    build:
+      context: .
+      target: cpp
+    command: ["cpp_inference_demo", "--requests", "100"]
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    depends_on:
+      - otel-collector
+
+volumes:
+  tempo-data:
+  prometheus-data:
+  grafana-data:

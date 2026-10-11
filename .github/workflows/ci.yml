@@ -1,0 +1,185 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  python-lint:
+    name: Python lint, format, types
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt -e ".[dev]"
+      - run: ruff check src tests examples scripts
+      - run: ruff format --check src tests examples scripts
+      - run: mypy
+      - name: Dashboards match generator
+        run: python scripts/generate_dashboards.py --check
+
+  python-tests:
+    name: Python tests (${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt -e ".[dev]"
+      - name: Unit tests (includes benchmark schema, regression checker and analysis rules)
+        run: pytest tests/python --cov --cov-report=term-missing:skip-covered
+
+  regression-checker:
+    name: Benchmark schema + regression checker (deterministic)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt -e ".[dev]"
+      - name: Virtual-clock benchmarks (deterministic, no timing noise)
+        run: |
+          inference-profiler benchmark --scenario examples/benchmark_scenarios.yaml \
+            --output out/baseline.json
+          inference-profiler benchmark --scenario examples/benchmark_scenarios.yaml \
+            --output out/same.json
+          inference-profiler benchmark --scenario examples/benchmark_scenarios.yaml \
+            --name baseline --inject prefill_multiplier=1.5 --runtime-version sim-1.1 \
+            --output out/regressed.json
+          inference-profiler validate --input out/baseline.json
+          inference-profiler validate --input benchmarks/baseline.example.json
+      - name: Non-regressing comparison must pass
+        run: inference-profiler compare --baseline out/baseline.json --current out/same.json
+      - name: Injected regression must be detected
+        run: |
+          set +e
+          inference-profiler compare --baseline out/baseline.json --current out/regressed.json
+          code=$?
+          set -e
+          test "$code" -eq 1 || { echo "expected exit code 1, got $code"; exit 1; }
+      - run: inference-profiler export-report --input out/regressed.json --baseline out/baseline.json --output out/report.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deterministic-benchmark-reports
+          path: out/
+
+  package:
+    name: Build Python distribution
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build==1.6.1
+      - run: python -m build
+      - name: Install wheel in a clean venv and smoke-test the CLI
+        run: |
+          python -m venv /tmp/wheel-venv
+          /tmp/wheel-venv/bin/pip install dist/*.whl
+          /tmp/wheel-venv/bin/inference-profiler --version
+          /tmp/wheel-venv/bin/inference-profiler benchmark \
+            --scenario examples/benchmark_scenarios.yaml --name baseline --output /tmp/r.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+
+  cpp:
+    name: C++ build + CTest (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-fetch
+            os: ubuntu-24.04
+            preset: fetch
+          - name: macos-homebrew
+            os: macos-14
+            preset: default
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libcurl4-openssl-dev libprotobuf-dev protobuf-compiler
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja opentelemetry-cpp
+      - name: Cache opentelemetry-cpp source build
+        if: matrix.preset == 'fetch'
+        uses: actions/cache@v4
+        with:
+          path: build-fetch/_deps
+          key: otel-cpp-v1.29.0-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+      - run: cmake --preset ${{ matrix.preset }}
+      - run: cmake --build --preset ${{ matrix.preset }}
+      - run: ctest --preset ${{ matrix.preset }}
+      - name: Native demo runs without a collector (export failures are contained)
+        run: |
+          dir=$([ "${{ matrix.preset }}" = fetch ] && echo build-fetch || echo build)
+          ./$dir/cpp_inference_demo --requests 5 --endpoint http://127.0.0.1:9
+
+  cpp-sanitizers:
+    name: C++ ASan/UBSan (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libcurl4-openssl-dev libprotobuf-dev protobuf-compiler
+      - name: Configure with sanitizers, building opentelemetry-cpp from source
+        run: |
+          cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DIPP_FETCH_OPENTELEMETRY=ON -DCMAKE_DISABLE_FIND_PACKAGE_opentelemetry-cpp=ON \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+      - run: cmake --build build-asan
+      - run: ctest --test-dir build-asan --output-on-failure
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+
+  static-analysis:
+    name: Static analysis (clang-tidy, shellcheck)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang-tidy shellcheck libcurl4-openssl-dev libprotobuf-dev protobuf-compiler
+      - run: shellcheck scripts/*.sh
+      - name: clang-tidy on library sources
+        run: |
+          cmake --preset fetch -DIPP_BUILD_TESTS=OFF -DIPP_BUILD_EXAMPLES=OFF
+          cmake --build --preset fetch
+          clang-tidy -p build-fetch --quiet \
+            --checks='-*,bugprone-*,performance-*,-bugprone-easily-swappable-parameters' \
+            cpp/src/*.cpp

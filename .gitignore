@@ -1,0 +1,45 @@
+# Python
+.venv
+venv
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# C++ / CMake
+build-*/
+out/
+cmake-build-*/
+CMakeUserPresets.json
+compile_commands.json
+*.o
+*.a
+*.so
+*.dylib
+
+# Local stack data and tools
+.native-stack/
+*.log
+
+# Generated benchmark output (keep the folder and the labelled example only)
+benchmarks/results/*
+!benchmarks/results/.gitkeep
+benchmarks/baseline.json
+
+# Secrets and editor/OS noise
+.env
+.env.*
+*.pem
+*.key
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

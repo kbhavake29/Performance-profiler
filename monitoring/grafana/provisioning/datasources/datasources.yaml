@@ -1,0 +1,44 @@
+# Provisioned on Grafana startup. URLs come from environment variables set in
+# docker-compose.yml (or scripts/native_stack.sh) so one file serves both setups.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: ${PROMETHEUS_URL}
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      timeInterval: 5s
+      # Exemplars on latency histograms link to the trace that produced them.
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: ${TEMPO_URL}
+    editable: false
+    jsonData:
+      nodeGraph:
+        enabled: true
+      search:
+        hide: false
+      # Trace -> metrics: jump from a span to the latency series of the same service.
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: "-5m"
+        spanEndTimeShift: "5m"
+        tags:
+          - key: service.name
+            value: job
+        queries:
+          - name: Request latency p95
+            query: histogram_quantile(0.95, sum by (le) (rate(inference_request_duration_seconds_bucket{$$__tags}[1m])))
+          - name: Request rate by status
+            query: sum by (inference_status) (rate(inference_requests_total{$$__tags}[1m]))

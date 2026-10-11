@@ -1,0 +1,67 @@
+name: Performance regression
+
+# Timing-sensitive comparison, kept separate from CI correctness checks.
+# Shared runners are noisy, so this workflow is manual/scheduled, compares two runs
+# measured back-to-back on the SAME runner (baseline ref vs. current ref), and
+# uses generous thresholds. Use a dedicated runner for tighter thresholds.
+on:
+  workflow_dispatch:
+    inputs:
+      baseline_ref:
+        description: "Git ref to use as the baseline"
+        default: "main"
+      latency_pct:
+        description: "Latency regression threshold (%)"
+        default: "25"
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BASELINE_REF: ${{ inputs.baseline_ref || 'main' }}
+      LATENCY_PCT: ${{ inputs.latency_pct || '25' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Baseline (wall clock, telemetry disabled)
+        run: |
+          git worktree add ../baseline "$BASELINE_REF"
+          python -m venv ../venv-baseline
+          ../venv-baseline/bin/pip install -r requirements-dev.txt -e ../baseline
+          ../venv-baseline/bin/inference-profiler benchmark --clock wall --no-export \
+            --scenario examples/benchmark_scenarios.yaml --name baseline --name congestion \
+            --requests 150 --label "baseline $BASELINE_REF" --overhead --output out/baseline.json
+      - name: Current (wall clock, telemetry disabled)
+        run: |
+          python -m venv ../venv-current
+          ../venv-current/bin/pip install -r requirements-dev.txt -e .
+          ../venv-current/bin/inference-profiler benchmark --clock wall --no-export \
+            --scenario examples/benchmark_scenarios.yaml --name baseline --name congestion \
+            --requests 150 --label "current ${{ github.sha }}" --overhead --output out/current.json
+      - name: Compare
+        run: |
+          ../venv-current/bin/inference-profiler compare --baseline out/baseline.json \
+            --current out/current.json --threshold latency_pct=$LATENCY_PCT \
+            --threshold throughput_pct=$LATENCY_PCT --threshold min_latency_delta_ms=2 \
+            --output out/comparison.json
+      - name: Report
+        if: always()
+        run: |
+          ../venv-current/bin/inference-profiler export-report --input out/current.json \
+            --baseline out/baseline.json --output out/report.md || true
+          cat out/report.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-reports
+          path: out/
